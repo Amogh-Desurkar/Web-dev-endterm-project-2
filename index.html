@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Wallet</title>
+
+<style>
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    margin: 0;
+    padding: 20px;
+}
+
+.app-container {
+    max-width: 900px;
+    margin: auto;
+    background: rgba(255,255,255,0.96);
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+}
+
+h1, h3 {
+    text-align: center;
+    color: #2c3e50;
+}
+
+/* ===== SUMMARY ===== */
+.summary-box {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.card {
+    flex: 1;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.income-card { background:#d4edda; color:#155724; }
+.expense-card { background:#f8d7da; color:#721c24; }
+.balance-card { background:#cce5ff; color:#004085; }
+
+/* ===== FORM ===== */
+.input-form {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+input, select, button {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+input { flex: 1; }
+
+button {
+    background: #2c3e50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #1a252f;
+}
+
+/* ===== HISTORY ===== */
+ul {
+    list-style: none;
+    padding: 0;
+    margin-top: 20px;
+}
+
+li {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.plus { border-left: 5px solid #2ecc71; }
+.minus { border-left: 5px solid #e74c3c; }
+
+.delete-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+/* ===== EXPENSE BOXES ===== */
+.stats-container {
+    margin-top: 40px;
+    border-top: 2px dashed #ddd;
+    padding-top: 20px;
+}
+
+.expense-boxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.expense-box {
+    padding: 16px;
+    border-radius: 14px;
+    text-align: center;
+    background: linear-gradient(135deg, #ffecec, #fff5f5);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+.expense-box h4 {
+    margin: 0;
+    color: #555;
+    font-size: 14px;
+}
+
+.expense-box p {
+    margin-top: 8px;
+    font-size: 22px;
+    font-weight: bold;
+    color: #e74c3c;
+}
+
+/* ===== OTHER INPUT ===== */
+.hidden {
+    display: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app-container">
+<h1>Smart Wallet</h1>
+
+<div class="summary-box">
+    <div class="card income-card">
+        <h3>INCOME</h3>
+        <p id="money-plus">₹0</p>
+    </div>
+    <div class="card expense-card">
+        <h3>EXPENSE</h3>
+        <p id="money-minus">₹0</p>
+    </div>
+    <div class="card balance-card">
+        <h3>BALANCE</h3>
+        <p id="balance">₹0</p>
+    </div>
+</div>
+
+<form id="form" class="input-form">
+    <input type="text" id="text" placeholder="Description" required>
+    <input type="number" id="amount" placeholder="Amount" required>
+
+    <select id="type">
+        <option value="income">Income (+)</option>
+        <option value="expense">Expense (-)</option>
+    </select>
+
+    <select id="category"></select>
+
+    <input type="text" id="otherInput" class="hidden" placeholder="Enter source / category">
+
+    <button>Add</button>
+</form>
+
+<div class="stats-container">
+    <h3>Where Your Money Went</h3>
+    <div id="expense-box-area" class="expense-boxes"></div>
+</div>
+
+<h3>History</h3>
+<ul id="list"></ul>
+</div>
+
+<script>
+const balanceDisplay = document.getElementById('balance');
+const incomeDisplay = document.getElementById('money-plus');
+const expenseDisplay = document.getElementById('money-minus');
+const list = document.getElementById('list');
+const form = document.getElementById('form');
+const textInput = document.getElementById('text');
+const amountInput = document.getElementById('amount');
+const typeInput = document.getElementById('type');
+const categoryInput = document.getElementById('category');
+const otherInput = document.getElementById('otherInput');
+const expenseBoxArea = document.getElementById('expense-box-area');
+
+let transactions = JSON.parse(localStorage.getItem('myTransactions')) || [];
+
+/* ===== CATEGORY SWITCH ===== */
+function updateCategoryOptions() {
+    categoryInput.innerHTML = '';
+    otherInput.classList.add('hidden');
+
+    const categories = typeInput.value === 'income'
+        ? ['Job', 'Business', 'Other']
+        : ['Food', 'Transport', 'Rent', 'Fun', 'Other'];
+
+    categories.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c;
+        o.innerText = c;
+        categoryInput.appendChild(o);
+    });
+}
+
+categoryInput.addEventListener('change', () => {
+    if (categoryInput.value === 'Other') {
+        otherInput.classList.remove('hidden');
+    } else {
+        otherInput.classList.add('hidden');
+        otherInput.value = '';
+    }
+});
+
+/* ===== ADD TO LIST ===== */
+function addTransactionToDOM(t) {
+    const li = document.createElement('li');
+    li.classList.add(t.type === 'income' ? 'plus' : 'minus');
+
+    li.innerHTML = `
+        <span>${t.text} (${t.category})</span>
+        <span>${t.type === 'income' ? '+' : '-'}₹${t.amount}
+        <button class="delete-btn" onclick="removeTransaction(${t.id})">x</button></span>
+    `;
+    list.appendChild(li);
+}
+
+/* ===== TOTALS ===== */
+function updateValues() {
+    let income = 0, expense = 0;
+
+    transactions.forEach(t => {
+        t.type === 'income' ? income += t.amount : expense += t.amount;
+    });
+
+    balanceDisplay.innerText = `₹${income - expense}`;
+    incomeDisplay.innerText = `₹${income}`;
+    expenseDisplay.innerText = `₹${expense}`;
+
+    drawExpenseBoxes();
+}
+
+/* ===== EXPENSE BOXES ===== */
+function drawExpenseBoxes() {
+    let categories = {};
+
+    transactions.forEach(t => {
+        if (t.type === 'expense') {
+            categories[t.category] = (categories[t.category] || 0) + t.amount;
+        }
+    });
+
+    expenseBoxArea.innerHTML = '';
+
+    if (Object.keys(categories).length === 0) {
+        expenseBoxArea.innerHTML = '<p style="color:#888">No expenses added yet</p>';
+        return;
+    }
+
+    for (let cat in categories) {
+        expenseBoxArea.innerHTML += `
+            <div class="expense-box">
+                <h4>${cat}</h4>
+                <p>₹${categories[cat]}</p>
+            </div>
+        `;
+    }
+}
+
+/* ===== ADD / REMOVE ===== */
+function addTransaction(e) {
+    e.preventDefault();
+
+    let finalCategory = categoryInput.value === 'Other'
+        ? otherInput.value.trim() || 'Other'
+        : categoryInput.value;
+
+    transactions.push({
+        id: Math.random(),
+        text: textInput.value,
+        amount: Number(amountInput.value),
+        type: typeInput.value,
+        category: finalCategory
+    });
+
+    updateLocalStorage();
+    init();
+
+    textInput.value = '';
+    amountInput.value = '';
+    otherInput.value = '';
+    otherInput.classList.add('hidden');
+}
+
+function removeTransaction(id) {
+    transactions = transactions.filter(t => t.id !== id);
+    updateLocalStorage();
+    init();
+}
+
+function updateLocalStorage() {
+    localStorage.setItem('myTransactions', JSON.stringify(transactions));
+}
+
+/* ===== INIT ===== */
+function init() {
+    list.innerHTML = '';
+    updateCategoryOptions();
+    transactions.forEach(addTransactionToDOM);
+    updateValues();
+}
+
+typeInput.addEventListener('change', updateCategoryOptions);
+form.addEventListener('submit', addTransaction);
+
+init();
+</script>
+
+</body>
+</html>
